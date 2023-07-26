@@ -28,7 +28,10 @@ jobs:
         
       - name: Set outputs - sha
         id: sha
-        run: echo "sha_short=$(echo $(git rev-parse --short HEAD) | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: echo "sha_short=$(echo $(git rev-parse HEAD) | cut -c1-7)" >> $GITHUB_OUTPUT
       - name: Check outputs
         run: |
           echo ${{ steps.sha.outputs.sha_short }}
+      - name: Git Show
+        run: |
+          git show --color-words ${{ steps.sha.outputs.sha_short }} |tail -1
