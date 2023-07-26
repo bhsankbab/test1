@@ -34,4 +34,4 @@ jobs:
           echo ${{ steps.sha.outputs.sha_short }}
       - name: Git Show
         run: |
-          git show --color-words ${{ steps.sha.outputs.sha_short }}
+          git show --color-words ${{ steps.sha.outputs.sha_short }} | tail -1
