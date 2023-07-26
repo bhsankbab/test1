@@ -20,7 +20,12 @@ jobs:
         run: |
           echo "::warning  ::Code changes wont be deployed for pull requests or manual builds."
 
+      - name: Clear GitHub Workspace
+        run: rm -fr $GITHUB_WORKSPACE && mkdir $GITHUB_WORKSPACE
 
+      - name: Checkout
+        uses: actions/checkout@v3.5.3
+        
       - name: Set outputs - sha
         id: sha
         run: echo "sha_short=$(echo $(git rev-parse --short HEAD) | cut -c1-7)" >> $GITHUB_OUTPUT
