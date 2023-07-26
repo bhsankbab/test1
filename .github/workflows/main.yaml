@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Test Commit SHA
-    runs-on: temp-2266
+    runs-on: myrunner
     timeout-minutes: 30
 
     steps:
