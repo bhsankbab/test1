@@ -1,0 +1,29 @@
+on:
+  # Triggers the workflow on push or pull request events but only for the develop branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  
+jobs:
+  build:
+    name: Test Commit SHA
+    runs-on: temp-2266
+    timeout-minutes: 30
+
+    steps:
+      - name: Event Info
+        if: ${{ !(github.event_name == 'push') }}
+        run: |
+          echo "::warning  ::Code changes wont be deployed for pull requests or manual builds."
+
+
+      - name: Set outputs - sha
+        id: sha
+        run: echo "sha_short=$(echo $(git rev-parse --short HEAD) | cut -c1-7)" >> $GITHUB_OUTPUT
+      - name: Check outputs
+        run: |
+          echo ${{ steps.sha.outputs.sha_short }}
