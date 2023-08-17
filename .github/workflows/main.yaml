@@ -1,15 +1,15 @@
-name: Adding Github Workflow Permission
-run-name: Updating Workflow permission with the repos ${{ inputs.repos }}
+name: Deleting Workflow Permission
+run-name: Deleting Workflow Permission for ${{ inputs.repos }}
 on:
   workflow_dispatch:
     inputs:
       repos:
         required: true
         type: string
-        description: Specify Repo Names to be added. If more than one, use comma separated values
+        description: Specify Repo Name or Names to be added
         default: "-"
 env:
-  org: bhsankbab
+  org: bhsankab
 jobs:
   workflow-permissions:
     runs-on: ubuntu-latest
@@ -36,19 +36,13 @@ jobs:
           git config --global user.name "${{ github.actor }}"
           git config --global user.email "${{ steps.my-script.outputs.result }}"
       - name: WorkFlow Permission Adding
-        env:
-          list: ${{ inputs.repo_list }}
         run: |
-            curl -L -X PUT  -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"  https://api.github.com/orgs/${{ env.org }}/actions/permissions -d '{"enabled_repositories":"selected","allowed_actions":"selected"}'
-            permissions=$(cat org-repos/thirdparty-sources.txt)
-            content=$(echo "${permissions//$'\n'/}")
-            echo $content
-            curl -L -X PUT  -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"  https://api.github.com/orgs/${{ env.org }}/actions/permissions/selected-actions -d '{"github_owned_allowed":true,"verified_allowed":true,"patterns_allowed":['"$content"']}'
             IFS=',' read -r -a repo <<< "${{ inputs.repos }}"
             for p in "${repo[@]}"; do
             status=$(curl -s  -L   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"   https://api.github.com/repos/${{ env.org }}/"$p" | jq -r .archived)
             if [ "$status" = "false" ]; then
-            curl -s  -L   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"   https://api.github.com/repos/${{ env.org }}/"$p" | jq -r .id >> org-repos/ids.txt
+            id=$(curl -s  -L   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"   https://api.github.com/repos/${{ env.org }}/"$p" | jq -r .id)
+            sed -i -e '/'"$id"'/d' org-repos/ids.txt
             else
             echo " Repo $p is Archived"
             fi
@@ -56,7 +50,7 @@ jobs:
             IDS=$(cat org-repos/ids.txt | tr -s '\n' ',' | awk 'gsub(/,$/,x)')
             echo " $IDS "
             curl -L -X PUT  -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/orgs/${{ env.org }}/actions/permissions/repositories -d '{"selected_repository_ids":['"$IDS"']}'
-            echo " Permission is added "
+            echo " Permission is Revoked "
             COMMIT_MESG=$(git log -1 --pretty=format:%s | head -n 1)
             GIT_RETRY=0
             until [ "$GIT_RETRY" -ge 10 ]
