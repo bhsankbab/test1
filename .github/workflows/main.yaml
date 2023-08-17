@@ -9,7 +9,7 @@ on:
         description: Specify Repo Name or Names to be added
         default: "-"
 env:
-  org: bhsankab
+  org: bhsankbab
 jobs:
   workflow-permissions:
     runs-on: ubuntu-latest
