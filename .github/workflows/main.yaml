@@ -1,5 +1,5 @@
-name: Github Secret Permission Delete 
-run-name: Github Secret Permission Adding ${{ inputs.secret }} for the list in org-repos/repolist.txt
+name: Adding Github Workflow Permission
+run-name: Updating Workflow permission with the repos ${{ inputs.repos }}
 on:
   workflow_dispatch:
     inputs:
@@ -8,14 +8,11 @@ on:
         type: string
         description: Specify Repo Names to be added. If more than one, use comma separated values
         default: "-"
-
 env:
   org: bhsankbab
-  secret: MY_TOKEN
 jobs:
-  secret-permissions:
+  workflow-permissions:
     runs-on: ubuntu-latest
-    environment: devops
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v3
@@ -38,35 +35,40 @@ jobs:
         run: |
           git config --global user.name "${{ github.actor }}"
           git config --global user.email "${{ steps.my-script.outputs.result }}"
-      - name: Adding Secret Permission for Repo
+      - name: WorkFlow Permission Adding
+        env:
+          list: ${{ inputs.repo_list }}
         run: |
-          status_check=$(curl -s -L   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"  "https://api.github.com/orgs/${{ env.org }}/actions/secrets/${{ env.secret }}" | jq -r '.visibility')
-          echo  Status is "$status_check"   
-          if [ "$status_check" == "selected" ]; then
-          IFS=',' read -r -a repo <<< "${{ inputs.repos }}"
-          for p in "${repo[@]}"; do
-          id=$(curl -s  -L   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"   https://api.github.com/repos/${{ env.org }}/"$p" | jq -r .id)
-          sed -i -e '/'"$id"'/d' org-repos/secrets_ids.txt
-          done
-          else
-          echo " ORG settings for Action Permission is not Seletected for Repositories. Please change it to selected and run the workflow"
-          exit 1
-          fi
-          IDS=$(cat org-repos/secrets_ids.txt | tr -s '\n' ',' | awk 'gsub(/,$/,x)')
-          echo " $IDS "
-          curl -s -L -X PUT   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"  "https://api.github.com/orgs/${{ env.org }}/actions/secrets/${{ env.secret }}/repositories" -d '{"selected_repository_ids":['"$IDS"']}'
-          COMMIT_MESG=$(git log -1 --pretty=format:%s | head -n 1)
-          GIT_RETRY=0
-          until [ "$GIT_RETRY" -ge 10 ]
-          do
-          git add org-repos
-          git diff --quiet && git diff --staged --quiet || git commit org-repos -m "$COMMIT_MESG [SKIP CI]"
-          git config pull.rebase false  # merge (the default strategy)
-          git push  && break  # substitute your command here
-          GIT_RETRY=$((GIT_RETRY+1))
-          RANDOM_WAIT_TIMER=$((1 + $RANDOM % 10))
-          sleep $RANDOM_WAIT_TIMER
-          git pull
-          echo "RETRY COUNT: $GIT_RETRY"          
-          done
+            curl -L -X PUT  -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"  https://api.github.com/orgs/${{ env.org }}/actions/permissions -d '{"enabled_repositories":"selected","allowed_actions":"selected"}'
+            permissions=$(cat org-repos/thirdparty-sources.txt)
+            content=$(echo "${permissions//$'\n'/}")
+            echo $content
+            curl -L -X PUT  -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"  https://api.github.com/orgs/${{ env.org }}/actions/permissions/selected-actions -d '{"github_owned_allowed":true,"verified_allowed":true,"patterns_allowed":['"$content"']}'
+            IFS=',' read -r -a repo <<< "${{ inputs.repos }}"
+            for p in "${repo[@]}"; do
+            status=$(curl -s  -L   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"   https://api.github.com/repos/${{ env.org }}/"$p" | jq -r .archived)
+            if [ "$status" = "false" ]; then
+            curl -s  -L   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"   https://api.github.com/repos/${{ env.org }}/"$p" | jq -r .id >> org-repos/ids.txt
+            else
+            echo " Repo $p is Archived"
+            fi
+            done
+            IDS=$(cat org-repos/ids.txt | tr -s '\n' ',' | awk 'gsub(/,$/,x)')
+            echo " $IDS "
+            curl -L -X PUT  -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/orgs/${{ env.org }}/actions/permissions/repositories -d '{"selected_repository_ids":['"$IDS"']}'
+            echo " Permission is added "
+            COMMIT_MESG=$(git log -1 --pretty=format:%s | head -n 1)
+            GIT_RETRY=0
+            until [ "$GIT_RETRY" -ge 10 ]
+            do
+            git add org-repos
+            git diff --quiet && git diff --staged --quiet || git commit org-repos -m "$COMMIT_MESG [SKIP CI]"
+            git config pull.rebase false  # merge (the default strategy)
+            git push  && break  # substitute your command here
+            GIT_RETRY=$((GIT_RETRY+1))
+            RANDOM_WAIT_TIMER=$((1 + $RANDOM % 10))
+            sleep $RANDOM_WAIT_TIMER
+            git pull
+            echo "RETRY COUNT: $GIT_RETRY"
+            done
         shell: bash
