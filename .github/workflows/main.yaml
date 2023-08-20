@@ -14,3 +14,4 @@ jobs:
           package-type: 'container'
           token: ${{ secrets.MY_TOKEN }}
           min-versions-to-keep: '3'
+          ignore-versions: '7.2,7.1,7.10'
