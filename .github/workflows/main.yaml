@@ -13,3 +13,4 @@ jobs:
           package-name: 'hello'
           package-type: 'container'
           token: ${{ secrets.MY_TOKEN }}
+          num-old-versions-to-delete: "3"
