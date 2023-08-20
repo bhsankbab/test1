@@ -13,4 +13,5 @@ jobs:
           package-name: 'hello'
           package-type: 'container'
           token: ${{ secrets.MY_TOKEN }}
-          ignore-versions: '^(0|[1-9]\\d*)\\.13$'
+          min-versions-to-keep: 3
+          ignore-versions: '^(0|[1-9]\\d*)\\.0\\.0$'
