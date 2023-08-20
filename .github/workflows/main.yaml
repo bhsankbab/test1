@@ -13,3 +13,4 @@ jobs:
           package-name: 'hello'
           package-type: 'container'
           token: ${{ secrets.MY_TOKEN }}
+          ignore-versions: '^(0|[1-9]\\d*)\\.13$'
