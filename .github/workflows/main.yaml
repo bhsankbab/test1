@@ -13,5 +13,4 @@ jobs:
           owner: 'bhsankbab'
           package-name: 'hello'
           package-type: 'container'
-          ignore-versions: 1.2
           token: ${{ secrets.MY_TOKEN }}
