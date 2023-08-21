@@ -24,6 +24,9 @@ jobs:
         with:
           repository: 'aquasecurity/kube-bench'
           github-server-url: 'https://github.com/'
+      - name: Check Docker file
+        run: |
+          ls ./Dockerfile
       - name: Set outputs - sha
         id: sha
         run: echo "sha_short=$(echo $(git rev-parse --short HEAD) | cut -c1-7)" >> $GITHUB_OUTPUT
