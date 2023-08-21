@@ -8,6 +8,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+    env:
+      GHCR_REPO: "ghcr.io/bhsankbab"
+      major_version: "1"
+      minor_version: "0"
+      image_name: "bn-kube-bench"
     steps:
       - name: Clear GitHub Workspace
         run: rm -fr $GITHUB_WORKSPACE && mkdir $GITHUB_WORKSPACE
@@ -17,7 +24,45 @@ jobs:
         with:
           repository: 'aquasecurity/kube-bench'
           github-server-url: 'https://github.com/'
-      - name: Check the content GitHub Workspace
+      - name: Set outputs - sha
+        id: sha
+        run: echo "sha_short=$(echo $(git rev-parse --short HEAD) | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Set outputs - tag
+        id: tag
         run: |
-          ls
-          pwd
+          if [ "${{ github.event_name }}" == "push" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+              echo "image_tag=${{ env.major_version }}.${{ env.minor_version }}.${{ github.run_number }}-${{ steps.sha.outputs.sha_short }}" >> $GITHUB_OUTPUT
+            else
+              BRANCH_REF=${{ github.ref }}
+              IFS='/' read -ra BRANCH_NAME <<< "$BRANCH_REF"
+              echo "image_tag=${{ env.major_version }}.${{ env.minor_version }}.${{ github.run_number }}-${{ steps.sha.outputs.sha_short }}-${BRANCH_NAME[-1]}" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "image_tag=PR-BUILD-${{ github.run_number }}-${{ steps.sha.outputs.sha_short }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Check outputs
+        run: |
+          echo ${{ steps.sha.outputs.sha_short }}
+          echo ${{ steps.tag.outputs.image_tag }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2.9.1
+      - name: Docker Login
+        uses: docker/login-action@v2.2.0
+        with:
+          registry: ghcr.io
+          username: sankbab
+          password: ${{ secrets.MY_TOKEN }}
+      - name: Build
+        uses: docker/build-push-action@v4.1.1
+        with:
+          context: ${{ inputs.context }}
+          file: ./Dockerfile
+          push: true
+          tags: ${{ env.GHCR_REPO }}/${{ env.image_name }}:${{ steps.tag.outputs.image_tag }}
+          no-cache: true
+      - name: Image details
+        run: |
+          echo "::notice title=container image tag::${{ env.GHCR_REPO }}/${{ inputs.image_name }}:${{ steps.tag.outputs.image_tag }}"
