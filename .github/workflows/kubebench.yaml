@@ -1,0 +1,24 @@
+# This workflow warns and then closes issues, PRs & branches that have had no activity for a specified amount of time.
+name: Kube Bench Build Code and Image Push
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: kube bench build and push package
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Clear GitHub Workspace
+        run: rm -fr $GITHUB_WORKSPACE && mkdir $GITHUB_WORKSPACE
+
+      - name: Checkout
+        uses: actions/checkout@v3.5.3
+        with:
+          repository: 'kube-bench'
+          github-server-url: 'https://github.com/aquasecurity/'
+      - name: Check the content GitHub Workspace
+        run: |
+          ls
+          pwd
