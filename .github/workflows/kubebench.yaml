@@ -59,7 +59,7 @@ jobs:
         uses: docker/build-push-action@v4.1.1
         with:
           context: ${{ inputs.context }}
-          file: ./Dockerfile
+          file: "./Dockerfile"
           push: true
           tags: ${{ env.GHCR_REPO }}/${{ env.image_name }}:${{ steps.tag.outputs.image_tag }}
           no-cache: true
