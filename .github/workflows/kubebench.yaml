@@ -15,8 +15,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3.5.3
         with:
-          repository: 'kube-bench'
-          github-server-url: 'https://github.com/aquasecurity/'
+          repository: 'aquasecurity/kube-bench'
+          github-server-url: 'https://github.com/'
       - name: Check the content GitHub Workspace
         run: |
           ls
