@@ -69,3 +69,276 @@ jobs:
       - name: Image details
         run: |
           echo "::notice title=container image tag::${{ env.GHCR_REPO }}/${{ inputs.image_name }}:${{ steps.tag.outputs.image_tag }}"
+      - name: Install Cosign
+        if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+        uses: sigstore/cosign-installer@v3.1.1
+        with:
+          cosign-release: ${{ vars.COSIGN_VERSION }}
+
+      - name: Digitally sign image
+        if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          printf %s "${COSIGN_SIGNING_PRIVATE_KEY}" > /tmp/cosign.key
+          cosign sign --key /tmp/cosign.key \
+            --tlog-upload=false \
+            -a "ref=${{ github.sha }}" \
+            ${TAGS}
+        env:
+          TAGS: ${{ env.GHCR_REPO }}/${{ inputs.image_name }}:${{ steps.tag.outputs.image_tag }}
+          COSIGN_SIGNING_PRIVATE_KEY: ${{ secrets.COSIGN_SIGNING_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+      - name: Image details
+        run: |
+          echo "::notice title=container image tag::${{ env.GHCR_REPO }}/${{ inputs.image_name }}:${{ steps.tag.outputs.image_tag }}"
+
+  container-scan:
+    needs: build
+    runs-on: ci-runners
+    name: trivy scan
+    env:
+      GHCR_REPO: "ghcr.io/bentlynevada-bh"
+
+    steps:
+      - name: Clear GitHub Workspace
+        run: rm -fr $GITHUB_WORKSPACE && mkdir $GITHUB_WORKSPACE
+
+      - name: Download Trivy Ignore
+        run: |
+          curl -s https://${{ secrets.GH_TOKEN }}@raw.githubusercontent.com/BentlyNevada-bh/shared-workflows/main/trivy/.trivyignore -o "${{ github.workspace }}/.trivyignore"
+          ls -a
+        shell: bash
+
+      - name: Install Trivy
+        run: |
+          rpm -ivh https://github.com/aquasecurity/trivy/releases/download/v${{ vars.TRIVY_VERSION }}/trivy_${{ vars.TRIVY_VERSION }}_Linux-64bit.rpm --force
+          trivy --version
+        shell: bash
+
+      - name: Docker Login
+        uses: docker/login-action@v2.2.0
+        with:
+          registry: ghcr.io
+          username: shyam-ks
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Run container scan
+        id: trivy
+        run: |
+          trivy image --quiet --severity MEDIUM,HIGH,CRITICAL --ignore-unfixed --ignorefile "${{ github.workspace }}/.trivyignore" --format json -o result.json "${{ env.GHCR_REPO }}/${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}"
+          trivy image --quiet --severity MEDIUM,HIGH,CRITICAL --ignore-unfixed --ignorefile "${{ github.workspace }}/.trivyignore" --exit-code 1 "${{ env.GHCR_REPO }}/${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}"
+
+      - name: Upload unwanted files scan report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3.1.2
+        with:
+          name: trivy-container-scan-report
+          path: result.json
+
+      - name: Step to Run on Failure
+        if: ${{ failure() && steps.trivy.outcome == 'failure' }}
+        run: |
+          echo "::error ::Trivy container scan failed with findings for blocking rules. See 'Run container scan' step or download the attached trivy-container-scan-report json report for details."
+
+  check_contents:
+    runs-on: ci-runners # ubuntu-latest
+    needs: build
+    name: check image contents
+    env:
+      GHCR_REPO: "ghcr.io/bentlynevada-bh"
+
+    steps:
+      - name: Docker Login
+        uses: docker/login-action@v2.2.0
+        with:
+          registry: ghcr.io
+          username: shyam-ks
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Checkout shared-workflows
+        uses: actions/checkout@v3.5.3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          repository: BentlyNevada-bh/shared-workflows
+          ref: "main"
+          path: "shared-workflows"
+
+      - id: check-for-unwanted-files
+        if: ${{ inputs.skip_unwantedfiles_check == 'false' }}
+        name: Check for unwanted files
+        uses: ./shared-workflows/actions/check-for-unwanted-files
+        with:
+          image_name: "${{ env.GHCR_REPO }}/${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}"
+          check_for_input_files: "${{ inputs.check_for_input_files }}"
+
+      - name: Scan status
+        if: ${{ inputs.skip_unwantedfiles_check == 'false' && steps.check-for-unwanted-files.outputs.scan-exit-code != 0 }}
+        uses: actions/github-script@v6.4.1
+        with:
+          script: |
+            core.setFailed('Unwanted files found or required files for container scans missing.')
+
+      - name: Install dive
+        run: |
+          curl -OL https://github.com/wagoodman/dive/releases/download/v${{ vars.DIVE_VERSION }}/dive_${{ vars.DIVE_VERSION }}_linux_amd64.rpm
+          rpm -i dive_${{ vars.DIVE_VERSION }}_linux_amd64.rpm --force
+          dive version
+          # wget https://github.com/wagoodman/dive/releases/download/v${{ vars.DIVE_VERSION }}/dive_${{ vars.DIVE_VERSION }}_linux_amd64.deb
+          # sudo apt install ./dive_${{ vars.DIVE_VERSION }}_linux_amd64.deb
+
+      - name: Run dive
+        run: |
+          export CI=true
+          dive "${{ env.GHCR_REPO }}/${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}"
+
+      - uses: mukunku/tag-exists-action@v1.2.0
+        id: checkTag
+        with:
+          tag: "${{ needs.build.outputs.image_tag }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create tag
+        if: ${{ steps.checkTag.outputs.exists  != 'true' && startsWith(github.ref, 'refs/heads/prod/') && github.event_name == 'push' }}
+        uses: actions/github-script@v6.4.1
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ needs.build.outputs.image_tag }}',
+              sha: context.sha
+            })
+
+  update-helm-chart:
+    if: ${{ !startsWith(github.ref, 'refs/heads/prod/') && github.event_name == 'push' && inputs.helm_chart_name  != '' }}
+    needs: [container-scan, check_contents]
+    runs-on: ci-runners # ubuntu-latest
+    name: deploy to dev
+    env:
+      GHCR_REPO: "ghcr.io/bentlynevada-bh"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.5.3
+
+      - name: Set outputs
+        id: sha
+        run: echo "sha_short=$(echo $(git rev-parse --short HEAD) | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Set outputs
+        id: tag
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+            echo "image_tag=${{ inputs.major_version }}.${{ inputs.minor_version }}.${{ github.run_number }}-${{ steps.sha.outputs.sha_short }}" >> $GITHUB_OUTPUT
+          else
+            BRANCH_REF=${{ github.ref }}
+            IFS='/' read -ra BRANCH_NAME <<< "$BRANCH_REF"
+            echo "image_tag=${{ inputs.major_version }}.${{ inputs.minor_version }}.${{ github.run_number }}-${{ steps.sha.outputs.sha_short }}-${BRANCH_NAME[-1]}" >> $GITHUB_OUTPUT
+          fi
+      - uses: actions/checkout@v3.5.3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          repository: BentlyNevada-bh/shared-workflows
+          ref: "main"
+          path: "shared-workflows"
+
+      - name: Checkout BentlyNevada-bh/helm-charts - master
+        if: ${{ !startsWith(github.ref, 'refs/heads/release/') }}
+        uses: actions/checkout@v3.5.3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          repository: BentlyNevada-bh/helm-charts
+          ref: "master"
+          path: "helm-charts"
+
+      - name: Checkout BentlyNevada-bh/helm-charts - release
+        if: ${{ github.ref == 'refs/heads/release/22.4' }}
+        uses: actions/checkout@v3.5.3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          repository: BentlyNevada-bh/helm-charts
+          ref: "release/22.4"
+          path: "helm-charts"
+
+      - name: Get noreply email address of actor
+        uses: actions/github-script@v6.4.1
+        id: my-script
+        with:
+          result-encoding: string
+          script: |
+            let user = await github.rest.users.getByUsername({
+              username: context.actor
+            });
+            return `${user.data.id}+${context.actor}@users.noreply.github.com`
+
+      - name: set git username and email
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ steps.my-script.outputs.result }}"
+
+      - name: Update helm chart value file
+        run: |
+          sudo python3 -m pip install --upgrade pip
+
+          pip install ruamel.yaml
+          COMMIT_MESG=$(git log -1 --pretty=format:%s | head -n 1)
+          GIT_RETRY=0
+          until [ "$GIT_RETRY" -ge 20 ]
+          do
+            if [[ ! -z "${{ inputs.helm_image_name }}" ]]; then
+              echo "INFO: Updating umbrella chart"
+              python3 ./shared-workflows/utils/update-image-tag-helm-umbrella.py ./helm-charts/charts/${{ inputs.helm_chart_name }}/values.yaml ${{ inputs.helm_image_name }} ${{ steps.tag.outputs.image_tag }}
+            else
+              echo "INFO: Updating single chart"
+              python3 ./shared-workflows/utils/update-image-tag-helm.py ./helm-charts/charts/${{ inputs.helm_chart_name }}/values.yaml ${{ steps.tag.outputs.image_tag }}
+            fi
+            chmod 777 ./shared-workflows/utils/readme-generator/readme-generator-for-helm
+            ./shared-workflows/utils/readme-generator/readme-generator-for-helm --values ./helm-charts/charts/${{ inputs.helm_chart_name }}/values.yaml --readme ./helm-charts/charts/${{ inputs.helm_chart_name }}/README.md
+            cat ./helm-charts/charts/${{ inputs.helm_chart_name }}/README.md
+
+            cd ./helm-charts
+            git add -A
+            git diff --quiet && git diff --staged --quiet || git commit -m "${{ steps.sha.outputs.sha_short }}: $COMMIT_MESG [SKIP CI]"
+            git config pull.rebase false  # merge (the default strategy)
+            git push  && break  # substitute your command here
+            GIT_RETRY=$((GIT_RETRY+1))
+            RANDOM_WAIT_TIMER=$((1 + $RANDOM % 10))
+            sleep $RANDOM_WAIT_TIMER
+            git pull
+            cd ..
+            echo "RETRY COUNT: $GIT_RETRY"
+          done
+
+      - name: helm chart details
+        run: |
+          echo "::notice title=helm chart url::https://github.com/BentlyNevada-bh/helm-charts/blob/master/charts/${{ inputs.helm_chart_name }}"
+      - uses: mukunku/tag-exists-action@v1.2.0
+        id: checkTag
+        with:
+          tag: "${{ steps.tag.outputs.image_tag }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create tag
+        if: steps.checkTag.outputs.exists  != 'true'
+        uses: actions/github-script@v6.4.1
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ steps.tag.outputs.image_tag }}',
+              sha: context.sha
+            })
+
+      - name: Delete week old PR container images
+        continue-on-error: true
+        uses: snok/container-retention-policy@v2.1.2
+        with:
+          image-names: ${{ inputs.image_name }}
+          cut-off: A week ago UTC
+          timestamp-to-use: updated_at
+          account-type: org
+          org-name: BentlyNevada-bh
+          filter-tags: PR-BUILD*
+          token: ${{ secrets.GH_TOKEN }}
