@@ -1,13 +1,15 @@
-name: Github Workflow And Secret Permission Update
-run-name: New Permission Manager
+name: Github Workflow Third Party Action Permission
+run-name: Updating Third Party Action Permission
 on:
-  workflow_dispatch:
+  pull_request_review:
+    types: [submitted]
 env:
   org: bhsankbab
 jobs:
   workflow-permissions:
+    if: github.event.review.state == 'approved'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v3
         with:
@@ -15,14 +17,8 @@ jobs:
             org-repos
           sparse-checkout-cone-mode: false
       - name: WorkFlow Permission Adding
-        env:
-          SUPER_SECRET: ${{ secrets.MY_TOKEN }}
-          list: ${{ inputs.repo_list }}
         run: |
-            IDS=$(cat org-repos/repositories.json | tr -s '\n' ',' | awk 'gsub(/,$/,x)')
-            echo " $IDS "
-            curl -L -X PUT  -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/orgs/${{ env.org }}/actions/permissions/repositories -d '{"selected_repository_ids":['"$IDS"']}'
-            echo " Workflow Permission is updated "
-            curl -s -L -X PUT   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"  "https://api.github.com/orgs/${{ env.org }}/actions/secrets/MY_TOKEN/repositories" -d '{"selected_repository_ids":['"$IDS"']}'
-            echo " Secret Permission is updated "
-        shell: bash
+            permissions=$(cat org-repos/thirdparty-sources.txt)
+            content=$(echo "${permissions//$'\n'/}")
+            echo $content
+            curl -L -X PUT  -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer ${{ secrets.MY_TOKEN }}"  -H "X-GitHub-Api-Version: 2022-11-28"  https://api.github.com/orgs/${{ env.org }}/actions/permissions/selected-actions -d '{"github_owned_allowed":true,"verified_allowed":true,"patterns_allowed":['"$content"']}'
