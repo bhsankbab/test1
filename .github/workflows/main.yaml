@@ -2,13 +2,15 @@ name: Github Workflow Third Party Action Permission
 run-name: Updating Third Party Action Permission
 on:
   pull_request:
+    branches:
+      - main
     paths:
       - 'org-repos/thirdparty-sources.txt'
 env:
   org: bhsankbab
 jobs:
   workflow-permissions:
-    if: github.event.review.state == 'approved'
+    if: github.event.pull_request.merged == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
