@@ -6,8 +6,6 @@ on:
       - closed
     branches:
       - 'main'
-    paths:
-      - 'org-repos/thirdparty-sources.txt'
 env:
   org: bhsankbab
 jobs:
