@@ -9,9 +9,9 @@ on:
 env:
   org: bhsankbab
 jobs:
-  workflow-permissions:
   if_merged:
     if: github.event.pull_request.merged == true
+  workflow-permissions:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
