@@ -1,11 +1,11 @@
 name: Github Workflow Third Party Action Permission
 run-name: Updating Third Party Action Permission
 on:
-  pull_request:
+  pull_request_target:
+    types:
+      - closed
     branches:
-      - main
-    paths:
-      - 'org-repos/thirdparty-sources.txt'
+      - 'main'
 env:
   org: bhsankbab
 jobs:
