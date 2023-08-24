@@ -1,7 +1,7 @@
 name: Github Workflow Third Party Action Permission
 run-name: Updating Third Party Action Permission
 on:
-  pull_request_target:
+  pull_request:
     types:
       - closed
     branches:
