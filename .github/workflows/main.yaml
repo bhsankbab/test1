@@ -12,8 +12,7 @@ env:
   org: bhsankbab
 jobs:
   workflow-permissions:
-    runs-on: ci-runners
-    environment: devops
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v3
