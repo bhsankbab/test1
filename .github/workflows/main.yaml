@@ -15,5 +15,5 @@ jobs:
           owner: bhsankbab
           package-name: hello
           package-type: 'container'
-          ignore-versions: '^(9|[1-9]\\d*)\\.3$'
+          ignore-versions: '^\d{9}\.\d{3}'
           token: ${{ secrets.MY_TOKEN }}
