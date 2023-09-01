@@ -1,13 +1,8 @@
 name: Github Workflow And Secret Permission Update
 run-name: Updating the Guthub Org Workflow permission
 on:
-  pull_request:
-    types:
-      - closed
-    branches:
-      - 'main'
-    paths:
-      - 'org-repos/repositories.json'
+  workflow_dispatch:
+
 env:
   org: bhsankbab
 jobs:
