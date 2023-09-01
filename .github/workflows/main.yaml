@@ -14,6 +14,5 @@ jobs:
         with:
           owner: bhsankbab
           package-name: hello
-          package-name:
           ignore-versions: 9.3
           token: ${{ secrets.MY_TOKEN }}
