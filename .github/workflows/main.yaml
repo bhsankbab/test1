@@ -12,8 +12,8 @@ jobs:
     steps:
       - uses: actions/delete-package-versions@v4
         with:
-        owner: bhsankbab
-        package-name: hello
-        package-name:
-        ignore-versions: 9.3
-        token: ${{ secrets.MY_TOKEN }}
+          owner: bhsankbab
+          package-name: hello
+          package-name:
+          ignore-versions: 9.3
+          token: ${{ secrets.MY_TOKEN }}
