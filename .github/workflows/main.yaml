@@ -13,7 +13,7 @@ jobs:
       - uses: actions/delete-package-versions@v4
         with:
           owner: bhsankbab
-          package-name: hello
+          package-name: bn-kube-bench
           package-type: 'container'
-          ignore-versions: '^\d{9}\.\d{3}'
+          delete-only-untagged-versions: true
           token: ${{ secrets.MY_TOKEN }}
