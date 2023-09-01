@@ -14,5 +14,6 @@ jobs:
         with:
           owner: bhsankbab
           package-name: hello
-          min-versions-to-keep: 2
+          package_type: 'container'
+          ignore-versions: '^(9|[1-9]\\d*)\\.3$'
           token: ${{ secrets.MY_TOKEN }}
