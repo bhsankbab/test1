@@ -1,5 +1,5 @@
-name: Github Workflow And Secret Permission Update
-run-name: Updating the Guthub Org Workflow permission
+name: Package Delete
+run-name: Package Delete
 on:
   workflow_dispatch:
 
