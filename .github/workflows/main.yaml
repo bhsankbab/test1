@@ -15,5 +15,5 @@ jobs:
           owner: bhsankbab
           package-name: bn-kube-bench
           package-type: 'container'
-          delete-only-untagged-versions: true
+          package-version-ids: '120243567'
           token: ${{ secrets.MY_TOKEN }}
