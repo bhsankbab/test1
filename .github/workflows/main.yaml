@@ -15,5 +15,5 @@ jobs:
           owner: bhsankbab
           package-name: hello
           package-type: 'container'
-          package-version-ids: '124289602'
+          package-version-ids: '124289832,124289832'
           token: ${{ secrets.MY_TOKEN }}
