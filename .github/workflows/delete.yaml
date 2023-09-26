@@ -1,6 +1,6 @@
-name: 'Kube Bench Benchmark Report'
+name: 'Container Delete'
 on:
-  workflow_call: 
+  workflow_dispatch: 
 
 jobs:
   clean-ghcr:
