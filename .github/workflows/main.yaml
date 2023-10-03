@@ -2,7 +2,13 @@ name: Package Delete
 run-name: Package Delete
 on:
   workflow_dispatch:
-
+  pull_request:
+    types:
+      - closed
+    branches:
+      - 'main'
+    paths:
+      - 'org-repos/repositories.json'
 env:
   org: bhsankbab
 jobs:
